@@ -63,7 +63,8 @@ public class KeyboardInput : MonoBehaviour
 
         // **2-2. 마우스 입력 처리 (시점 회전 및 상호작용)**
         Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        
+       // Cursor.visible = false;
 
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
