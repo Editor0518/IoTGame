@@ -61,7 +61,7 @@ public class InteractionHandler : MonoBehaviour
             // 맞은 지점에 작은 표시점(구체) 찍기
             Debug.DrawRay(hit.point, Vector3.up * 0.2f, Color.yellow);
             
-            Debug.Log("ray hit obj's tag: "+hit.transform.tag);
+//            Debug.Log("ray hit obj's tag: "+hit.transform.tag);
 
             Outline newOutline=null;
 
