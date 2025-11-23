@@ -52,6 +52,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: jjuu_fix
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: fec0b39ff7e1ae240887339de66cd4b0, type: 3}
+      propertyPath: m_TagString
+      value: jju
+      objectReference: {fileID: 0}
     - target: {fileID: 5328482478806888397, guid: fec0b39ff7e1ae240887339de66cd4b0, type: 3}
       propertyPath: m_LocalPosition.y
       value: -0
