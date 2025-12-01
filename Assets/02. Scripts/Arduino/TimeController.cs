@@ -1,4 +1,5 @@
 using UnityEngine;
+using TMPro;
 
 public class TimerController : MonoBehaviour
 {
@@ -10,8 +11,16 @@ public class TimerController : MonoBehaviour
     private bool isRunning = false;
     private bool isTimeOver = false;
 
+    private bool useSensor;
+    
+    [Header("Timer UI")]
+    public TMP_Text timeText;
+    
+
     void Start()
     {
+        useSensor=InputManager.currentInputType.Equals(InputManager.InputType.SENSOR);
+        
         StartTimer();
     }
 
@@ -25,8 +34,19 @@ public class TimerController : MonoBehaviour
         isTimeOver = false;
         lastSentSeconds = -1;
 
+        int seconds = Mathf.RoundToInt(remainingTime);
+        
+        if(useSensor)
         // 시작 시 현재 시간(예: 300초) 한 번 보내두기
-        SendTimeToArduino(Mathf.RoundToInt(remainingTime));
+            SendTimeToArduino(seconds);
+        ChangeTimeText(seconds);
+    }
+
+    void ChangeTimeText(int seconds)
+    {
+        int minutes = seconds / 60;
+        seconds %= 60;
+        timeText.text = minutes.ToString("00") + ":" + seconds.ToString("00");
     }
 
     void Update()
@@ -49,7 +69,8 @@ public class TimerController : MonoBehaviour
         if (currentSeconds != lastSentSeconds)
         {
             lastSentSeconds = currentSeconds;
-            SendTimeToArduino(currentSeconds);
+            if(useSensor) SendTimeToArduino(currentSeconds);
+            ChangeTimeText(currentSeconds);
         }
     }
 
@@ -73,7 +94,7 @@ public class TimerController : MonoBehaviour
         }
 
         // 디버그용으로 보고 싶으면 주석 해제
-        Debug.Log("[TimerController] Send to Arduino: " + seconds);
+//        Debug.Log("[TimerController] Send to Arduino: " + seconds);
 
         ArduinoSerialManager.Instance.SendRemainingTime(seconds);
     }

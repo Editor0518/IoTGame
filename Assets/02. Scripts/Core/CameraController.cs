@@ -12,6 +12,8 @@ public class CameraController : MonoBehaviour
     
     [Header("Smoothing")]
     public float smoothTime = 0.1f; // 움직임 부드럽게 (0.1 ~ 0.2 추천)
+    [Tooltip("마우스/키보드 입력의 회전 가속도. 센서 사용 시 무시됨.")]
+    public float mouseRotationSpeed = 500f; // 마우스 입력에 사용할 회전 속도 (Degree/s)
 
     [Header("Debug")]
     public bool isCalibrating = false;
@@ -19,9 +21,9 @@ public class CameraController : MonoBehaviour
 
     private Camera cam;
     
-    // 회전값 누적 변수
-    private float yaw = 0f;   // 좌우 (Y축, 자이로 사용)
-    private float pitch = 0f; // 상하 (X축, 가속도+자이로 융합 or 가속도 단독)
+    // 회전값 누적 변수: 마우스/키보드 입력과 센서 입력 모두 이 변수를 통해 회전됩니다.
+    private float yaw = 0f;   // 좌우 (Y축)
+    private float pitch = 0f; // 상하 (X축)
     private float roll = 0f;  // 기울기 (Z축) - 0으로 고정됨
 
     // 캘리브레이션용 오차값 변수
@@ -31,7 +33,8 @@ public class CameraController : MonoBehaviour
 
     // 부드러운 회전을 위한 속도 변수 (SmoothDamp용)
     private Vector3 currentVelocity;
-
+    
+    
     void Start()
     {
         cam = Camera.main;
@@ -39,9 +42,21 @@ public class CameraController : MonoBehaviour
         if (serialManager == null)
             serialManager = FindFirstObjectByType<ArduinoSerialManager>();
 
+        // useSensor 변수는 InputManager의 현재 입력 타입에 따라 설정됩니다.
+        useSensor = InputManager.currentInputType.Equals(InputManager.InputType.SENSOR);
+        
         // 시작하자마자 센서 0점 조절 시작
         if (useSensor)
             StartCoroutine(CalibrateSensor(2.0f)); // 2초 동안 보정
+        else
+        {
+            // 센서를 사용하지 않을 경우, 현재 카메라 회전값을 yaw/pitch에 초기값으로 설정합니다.
+            // 이렇게 해야 마우스 회전 시작 시 튀지 않습니다.
+            Vector3 currentEuler = cam.transform.localRotation.eulerAngles;
+            yaw = currentEuler.y;
+            // -180~180 범위로 변환하여 자연스러운 pitch 연산이 되도록 합니다.
+            pitch = currentEuler.x > 180 ? currentEuler.x - 360 : currentEuler.x;
+        }
     }
 
     // 1. 센서 보정 코루틴 (시작 시 2초간 움직이지 마세요!)
@@ -78,13 +93,25 @@ public class CameraController : MonoBehaviour
 
         isCalibrating = false;
         Debug.Log($"보정 완료! Bias -> X:{gyroBiasX:F2}, Y:{gyroBiasY:F2}, Z:{gyroBiasZ:F2}");
+        
+        // 센서 보정 완료 후 초기 카메라 회전값을 yaw/pitch에 설정
+        Vector3 currentEuler = cam.transform.localRotation.eulerAngles;
+        yaw = currentEuler.y;
+        pitch = currentEuler.x > 180 ? currentEuler.x - 360 : currentEuler.x;
     }
 
     void Update()
     {
-        if (!useSensor || serialManager == null || isCalibrating) return;
+        if (useSensor)
+        {
+            // 센서 입력 모드일 경우 센서 데이터만 처리
+            if (serialManager == null || isCalibrating) return;
+            ProcessSensorInput();
+        }
+        // 마우스 입력 모드일 경우, KeyboardInput에서 Rotate 함수를 통해 이미 처리됩니다.
 
-        ProcessSensorInput();
+        // 마우스/센서 입력에 관계없이 최종 회전은 Update 끝에서 한 번만 적용합니다.
+        ApplyRotation();
     }
 
     void ProcessSensorInput()
@@ -117,35 +144,66 @@ public class CameraController : MonoBehaviour
         float targetPitch = Mathf.Atan2(accY, accZ) * Mathf.Rad2Deg;
         
         // [Roll - 기울기] - 기능 비활성화 (0으로 고정)
-        // 화면이 기울어지는 것을 막기 위해 계산 로직을 주석 처리하고 0으로 고정합니다.
-        /* float targetRoll = Mathf.Atan2(-accX, accZ) * Mathf.Rad2Deg;
-        roll = Mathf.LerpAngle(roll, targetRoll, 0.1f);
-        */
         roll = 0f; // 강제로 0도 고정
 
         // 자이로와 가속도 섞기 (Pitch만 적용)
         pitch = Mathf.LerpAngle(pitch, targetPitch, 0.1f); // 0.1f는 반응속도
 
         // 각도 제한 (목 꺾임 방지)
-        // pitch = Mathf.Clamp(pitch, -80f, 80f); 
-
-        // --- 4. 최종 회전 적용 ---
-        // Roll(Z축)은 항상 0으로 입력됨
-        Quaternion targetRotation = Quaternion.Euler(pitch, yaw, roll);
-        
-        // 부드럽게 회전 (SmoothDamp)
-        cam.transform.localRotation = Quaternion.Slerp(cam.transform.localRotation, targetRotation, smoothTime * 10 * Time.deltaTime);
+        // pitch = Mathf.Clamp(pitch, -80f, 80f); // 필요 시 주석 해제
 
         if (showDebugLog)
         {
-            Debug.Log($"Pitch: {pitch:F1}, Yaw: {yaw:F1}, Roll: {roll:F1}");
+            Debug.Log($"[Sensor] Pitch: {pitch:F1}, Yaw: {yaw:F1}, Roll: {roll:F1}");
         }
     }
     
-    // 외부 강제 회전 (필요 시)
+    // --- 마우스/키보드 및 센서 입력 모두 이 함수를 사용합니다. ---
+    /// <summary>
+    /// 마우스 또는 센서 입력으로부터 받은 회전 델타를 누적 변수에 적용합니다.
+    /// </summary>
+    /// <param name="eulerAngles">회전 델타 (X: Pitch, Y: Yaw)</param>
     public void Rotate(Vector3 euler)
     {
-        yaw += euler.y;
-        pitch += euler.x;
+        if (useSensor)
+        {
+            // 센서 모드에서는 마우스 입력이 들어오지 않으므로, 이 부분을 신경쓰지 않아도 됩니다.
+            // 하지만 만약 센서와 마우스 입력을 동시에 받아 처리해야 한다면 로직 조정이 필요합니다.
+            // 현재 요구사항은 "둘 다 지원"이므로, 입력 타입에 따라 덮어쓰지 않고 누적합니다.
+            // 센서 모드에서는 ProcessSensorInput()이 yaw/pitch를 덮어씁니다.
+            return; 
+        }
+
+        // 마우스/키보드 입력 모드 (Yaw와 Pitch 누적)
+        // euler.y (Mouse X) -> Yaw (좌우)
+        // euler.x (Mouse Y) -> Pitch (상하)
+        
+        // 마우스 감도(mouseRotationSpeed)를 적용하여 회전 속도 조절
+        float sensitivity = mouseRotationSpeed * Time.deltaTime;
+        
+        yaw += euler.y * sensitivity;
+        pitch += euler.x * sensitivity;
+        
+        // pitch 제한 (시야가 360도 회전하는 것을 방지)
+        pitch = Mathf.Clamp(pitch, -80f, 80f); 
+
+        if (showDebugLog)
+        {
+            Debug.Log($"[Mouse] Pitch: {pitch:F1}, Yaw: {yaw:F1}");
+        }
+    }
+    
+    /// <summary>
+    /// 누적된 yaw/pitch 값을 사용하여 카메라에 최종 회전을 적용합니다.
+    /// </summary>
+    private void ApplyRotation()
+    {
+        // 4. 최종 회전 적용
+        // Roll(Z축)은 항상 0으로 입력됨
+        Quaternion targetRotation = Quaternion.Euler(pitch, yaw, roll);
+        
+        // 부드럽게 회전 (SmoothDamp와 유사한 Slerp 방식)
+        // smoothTime 값이 클수록 회전이 느려집니다.
+        cam.transform.localRotation = Quaternion.Slerp(cam.transform.localRotation, targetRotation, smoothTime * 10 * Time.deltaTime);
     }
 }

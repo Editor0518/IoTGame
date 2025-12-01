@@ -5,27 +5,62 @@ public class KeyboardInput : MonoBehaviour
     ///키보드 입력을 감지하여 PlayerController에 명령을 전달합니다.
     /// 임시 테스트 목적으로, 나중에 SensorInput으로 대체합니다.
     
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-        
-    }
+    // 이 변수는 더 이상 CameraController 내부에서 처리되므로 사용하지 않습니다. (주석 처리 또는 제거 가능)
+    // [SerializeField] private float mouseSensitivity = 20f;
     
-    // 마우스 회전 속도를 조절하기 위한 변수
-    [SerializeField] private float mouseSensitivity = 20f;
-    
-    // 카메라 회전을 잠글 상태 변수
+    // 카메라 회전을 잠글 상태 변수 (이 로직은 센서와 함께 쓰일 때만 유효)
     private bool isRotationLocked = false;
     // 카메라 회전을 잠그는 시간 (초)
     [SerializeField] private float lockoutDuration = 0.5f;
     // 잠금 해제 시간이 저장되는 변수
     private float rotationLockoutEndTime = 0f;
 
+    private InteractionHandler interactionHandler;
+    
+    void Start()
+    {
+        // InteractionHandler 참조
+        GameObject player = GameObject.FindWithTag("Player");
+        if (player != null)
+        {
+            interactionHandler = player.GetComponent<InteractionHandler>();
+        }
+    }
+    
     void Update()
     {
+        // InputManager의 현재 입력 타입이 KEYBOARD인지 확인 (선택 사항)
+        if (InputManager.currentInputType != InputManager.InputType.KEYBOARD)
+        {
+            // 센서 입력 모드일 경우 키보드 움직임만 처리
+            ProcessMovement();
+            // 마우스 회전은 처리하지 않음
+            return; 
+        }
+
         // 1. 캐릭터 이동 (W/A/S/D 키) - 기존 로직 유지
+        ProcessMovement();
+
+        // 2. 마우스 입력 처리 (시점 회전)
+        ProcessMouseRotation();
+        
+        // 3. 마우스 왼쪽 클릭 (상호작용 - 잡기/놓기)
+        if (Input.GetMouseButtonDown(0) && interactionHandler != null)
+        {
+            // 마우스 클릭 시 InteractionHandler에 상호작용 시도 요청
+            interactionHandler.TryInteract();
+        }
+
+        // **이전의 '휙 움직여서 상호작용 감지' 로직은 Cooking Simulator 스타일에 맞게 제거되었습니다.**
+    }
+
+    private void ProcessMovement()
+    {
         Vector3 moveDirection = Vector3.zero;
 
+        // Note: W/A/S/D 이동은 카메라의 Forward 방향을 기준으로 처리하는 것이 일반적이지만,
+        // 현재 코드는 Vector3.forward/back/left/right를 사용하고 있어 그대로 유지합니다.
+        // 만약 카메라 시점 기준으로 움직이고 싶다면, InputManager에서 회전 정보를 적용해야 합니다.
         if (Input.GetKey(KeyCode.W))
         {
             moveDirection += Vector3.forward;
@@ -51,73 +86,30 @@ public class KeyboardInput : MonoBehaviour
         {
             InputManager.instance.OnMoveCharacter(Vector3.zero);
         }
+    }
 
-        // ----------------------------------------------------
-
-        // **2-1. 회전 잠금 해제 타이머 확인**
+    private void ProcessMouseRotation()
+    {
+        // 1. 회전 잠금 해제 타이머 확인 (센서 입력에서 유용)
         if (isRotationLocked && Time.time >= rotationLockoutEndTime)
         {
             isRotationLocked = false;
-            // Debug.Log("카메라 회전 잠금 해제.");
         }
 
-        // **2-2. 마우스 입력 처리 (시점 회전 및 상호작용)**
-        Cursor.lockState = CursorLockMode.Locked;
-        
-       // Cursor.visible = false;
+        // 2. 시점 회전 (잠금 상태가 아닐 때만 실행)
+        if (!isRotationLocked) 
+        {
+            // GetAxis는 이미 프레임 간의 델타 값을 반환합니다.
+            // mouseSensitivity를 제거하고 순수한 델타 값만 사용합니다.
+            float mouseX = Input.GetAxis("Mouse X");
+            float mouseY = Input.GetAxis("Mouse Y");
 
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
+            // X축(Pitch)은 마우스 Y축 이동, Y축(Yaw)은 마우스 X축 이동
+            // Input.GetAxis("Mouse Y")는 위로 움직일 때 양수, 아래로 움직일 때 음수입니다. 
+            // Pitch는 위로 볼 때 각도가 감소해야 하므로 부호를 반전합니다. (-mouseY)
+            Vector3 rotationDelta = new Vector3(-mouseY, mouseX, 0f); 
 
-        Vector3 rotationDelta = new Vector3(-mouseY, mouseX, 0f);
-
-        // 상호작용 임계값 (테스트를 위해 임시로 설정)
-        const float INTERACT_THRESHOLD = 40f;
-
-        // 3. 상호작용 감지 및 카메라 잠금 실행
-        bool interactionDetected = false;
-        InputManager.InteractState interactState = InputManager.InteractState.NONE;
-
-        if (rotationDelta.x > INTERACT_THRESHOLD)
-        {
-            interactState = InputManager.InteractState.TO_DOWN; // 위에서 아래로 휙 내렸음
-            interactionDetected = true;
-        }
-        else if (rotationDelta.x < -INTERACT_THRESHOLD)
-        {
-            interactState = InputManager.InteractState.TO_UP; // 아래에서 위로 휙 올렸음
-            interactionDetected = true;
-        }
-        else if (rotationDelta.y > INTERACT_THRESHOLD)
-        {
-            interactState = InputManager.InteractState.TO_RIGHT; // 왼쪽에서 오른쪽으로 휙 움직였음
-            interactionDetected = true;
-        }
-        else if (rotationDelta.y < -INTERACT_THRESHOLD)
-        {
-            interactState = InputManager.InteractState.TO_LEFT; // 오른쪽에서 왼쪽으로 휙 돌렸음
-            interactionDetected = true;
-        }
-        
-        if (interactionDetected&&!isRotationLocked)
-        {
-            // 상호작용 이벤트 발생
-            InputManager.instance.OnInteractTriggered(interactState);
-            
-            // 카메라 회전 잠금 설정
-            isRotationLocked = true;
-            rotationLockoutEndTime = Time.time + lockoutDuration;
-//            Debug.Log($"상호작용 발생. 회전 잠금: {lockoutDuration}초");
-        }
-        // ----------------------------------------------------
-        
-        // 4. 시점 회전 (잠금 상태가 아닐 때만 실행)
-        // 상호작용이 감지되지 않았고, 현재 잠금 상태가 아닐 때만 회전 이벤트를 전달
-        else if (!isRotationLocked) 
-        {
             InputManager.instance.OnRotateView(rotationDelta);
         }
-        
-        // 잠금 상태일 때는 아무 일도 하지 않으므로, 카메라 시점 회전이 멈춤
     }
 }

@@ -7,6 +7,8 @@ TagManager:
   - pot
   - jju
   - stick
+  - stickholder
+  - stickPos
   layers:
   - Default
   - TransparentFX
@@ -15,9 +17,9 @@ TagManager:
   - Water
   - UI
   - NoRaycast
-  - 
-  - 
-  - 
+  - stick
+  - jju
+  - stickjju
   - 
   - 
   - 
