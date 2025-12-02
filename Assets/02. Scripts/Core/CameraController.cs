@@ -17,7 +17,7 @@ public class CameraController : MonoBehaviour
 
     [Header("Debug")]
     public bool isCalibrating = false;
-    public bool showDebugLog = false;
+    public bool showDebugLog = true;
 
     private Camera cam;
     
@@ -113,7 +113,7 @@ public class CameraController : MonoBehaviour
         // 마우스/센서 입력에 관계없이 최종 회전은 Update 끝에서 한 번만 적용합니다.
         ApplyRotation();
     }
-
+/*
     void ProcessSensorInput()
     {
         // --- 1. 자이로 데이터 읽기 및 오차 보정 ---
@@ -155,6 +155,61 @@ public class CameraController : MonoBehaviour
         if (showDebugLog)
         {
             Debug.Log($"[Sensor] Pitch: {pitch:F1}, Yaw: {yaw:F1}, Roll: {roll:F1}");
+        }
+    }
+    */
+
+// ... (기존 Start, CalibrateSensor, Update 등 유지)
+    
+    void ProcessSensorInput()
+    {
+        // --- 1. 자이로 데이터 읽기 및 오차 보정 ---
+        // 아두이노에서 /16384.0 처리가 되어 있다고 가정 (회전 속도 deg/s)
+        float rawGyX = serialManager.GyX - gyroBiasX;
+        float rawGyY = serialManager.GyY - gyroBiasY;
+        float rawGyZ = serialManager.GyZ - gyroBiasZ;
+
+        // Deadzone (너무 작은 떨림 무시)
+        if (Mathf.Abs(rawGyX) < 0.05f) rawGyX = 0;
+        if (Mathf.Abs(rawGyY) < 0.05f) rawGyY = 0;
+        if (Mathf.Abs(rawGyZ) < 0.05f) rawGyZ = 0;
+
+        // --- 2. 회전 계산 (자이로 적분) ---
+
+        // [Yaw - 좌우]: Y축 회전. GyZ 또는 GyY를 사용 (아두이노 코드 [cite: 30] 기준으로 Z축을 Yaw로 가정하고 진행)
+        // 회전 속도 * Time.deltaTime = 회전 각도 델타
+        // 부호는 센서 부착 방향에 따라 조정 필요
+        yaw += -rawGyZ * rotationSpeed * Time.deltaTime; 
+
+        // [Pitch - 상하]: X축 회전. GyX 또는 GyY를 사용
+        // 상하 움직임에는 GyX를 사용한다고 가정
+        // Pitch는 Clamp가 필요하므로 적분 방식으로 적용
+        pitch += -rawGyX * rotationSpeed * Time.deltaTime; 
+        
+        // [Roll - 기울기]: Z축 회전 (Roll은 사용하지 않거나, GyY를 사용)
+        // roll은 그대로 0f를 유지합니다.
+
+        // --- 3. Pitch 각도 제한 (목 꺾임 방지) ---
+        pitch = Mathf.Clamp(pitch, -80f, 80f); 
+        
+        // --- 4. 가속도 데이터 통합 (필터링 - Pitch만) ---
+        
+        // 가속도 데이터 읽기 (절대 각도 계산용)
+        float accY = serialManager.AcY;
+        float accZ = serialManager.AcZ;
+        
+        // 가속도 센서를 이용한 Target Pitch (절대 각도) 계산
+        // 센서 방향에 따라 accY, accZ 순서나 부호가 바뀔 수 있음
+        // atan2(Y축 힘, Z축 힘) -> X축 회전 각도
+        float accelTargetPitch = Mathf.Atan2(accY, accZ) * Mathf.Rad2Deg;
+        
+        // 상보 필터(Complementary Filter) 또는 가중치 평균을 사용하여 자이로 적분 값과 가속도 절대각을 섞습니다.
+        // 현재 로직: pitch (자이로 적분 값)을 accelTargetPitch (가속도 값) 쪽으로 LerpAngle (부드럽게 보정)
+        pitch = Mathf.LerpAngle(pitch, accelTargetPitch, 0.1f); // 0.1f는 반응 속도
+        
+        if (showDebugLog)
+        {
+            Debug.Log($"[Sensor] Pitch: {pitch:F1}, Yaw: {yaw:F1}");
         }
     }
     
