@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class JjuStick : MonoBehaviour
@@ -6,6 +7,7 @@ public class JjuStick : MonoBehaviour
     public int jjuCount = 0;
     Rigidbody rb;
     Transform[] attachPoints=new Transform[3];
+    
 
     private void Start()
     {
@@ -35,6 +37,7 @@ public class JjuStick : MonoBehaviour
 
         
         jjuCount++;
+        SoundManager.instance.PlaySound(clipJjuToStick);
         
         rb.isKinematic = true; // Stick 고정
         // 추가: 붙일 때 충격을 없애기 위해 속도도 0으로 초기화
@@ -60,7 +63,7 @@ public class JjuStick : MonoBehaviour
         // ⭐ 핵심: 콜라이더 비활성화
         if (jjuRb.TryGetComponent(out Collider jjuCol))
         {
-            jjuCol.enabled = false;
+            jjuCol.isTrigger = true;
         }
         
         InteractionHandler.instance.NoSelectedObject(); //성공적 종료
@@ -127,4 +130,76 @@ public class JjuStick : MonoBehaviour
             }
         }
     }
+
+    public string[] GetJjuScore()
+    {
+        List<Jju> jjuList = new List<Jju>();
+        for (int i = 0; i < attachPoints.Length; i++)
+        {
+            if(attachPoints[i].childCount > 0)
+                jjuList.Add(attachPoints[i].GetChild(0).GetComponent<Jju>());
+        }
+        int[] score = {0,0,0};
+        string msg1="",msg2="";
+        
+        for (int i = 0; i < jjuList.Count; i++)
+        {
+            float cookLevel = jjuList[i].cookLevel;
+            float sauceAmount = jjuList[i].sauceAmount;
+
+            int thisScore = 100; //개당 100캐피로 시작.
+
+            
+            if (cookLevel >= 0.9f) //0.9 ~ 1.0+ 타버림
+            {
+                //burnt!
+                thisScore = -300;
+                score[i] = thisScore;
+                msg2 = "쮸가 다 타서 왔어요... ";
+                break;
+            }
+            else if (cookLevel >= 0.55 && cookLevel <= 0.65f) //0.55 ~ 0.65 (0.1 구간)
+            {
+                //very well!
+                thisScore = 150;
+                if(msg2!="")
+                    msg2="너무너무 맛있어요! ";
+            }
+            else if (cookLevel >= 0.4 && cookLevel < 0.55f) //0.4 ~ 0.54 (0.14 구간)
+            {
+                //good!
+                thisScore = 100;
+                if(msg2!="")
+                    msg2="맛있네요! ";
+            }
+            else if (cookLevel < 0.4f) //0.0 ~ 0.54 (0.4 구간)
+            {
+                //not cooked!
+                thisScore = 0;
+                score[i] = thisScore;
+                msg2="쮸가 안 익었어요... ";
+                break;
+            }
+            else if (cookLevel < 0.9f) //0.66 ~ 0.89 (0.23 구간)
+            {
+                //overcooked!
+                thisScore = 70;
+                score[i] = thisScore;
+                msg2="쮸가 너무 많이 익었어요... ";
+                break;
+            }
+            //소스가 충분히 안발라져 있으면 50캐피 감점
+            if (sauceAmount < 0.95f)
+            {
+                thisScore -= 50;
+                msg1 = "소스가 덜 묻었고, ";
+            }
+            score[i] = thisScore;
+        }
+        int finalScore=score[0]+score[1]+score[2];
+        if(finalScore<0) finalScore=0;
+        
+        return new string[] { msg1+msg2+finalScore.ToString()+"캐피 드리겠습니다.", finalScore.ToString() };
+    }
+    public AudioClip clipJjuToStick;//쮸 꼬치에 끼움
 }

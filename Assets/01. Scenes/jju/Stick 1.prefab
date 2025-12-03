@@ -52,7 +52,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.05, y: 0.04, z: 0.05}
+  m_Size: {x: 0.15, y: 0.07, z: 0.05}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &6053618574979456232
 MonoBehaviour:
@@ -124,7 +124,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.05, y: 0.04, z: 0.05}
+  m_Size: {x: 0.15, y: 0.07, z: 0.05}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &2789913368924749901
 MonoBehaviour:
@@ -196,7 +196,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.05, y: 0.04, z: 0.05}
+  m_Size: {x: 0.15, y: 0.07, z: 0.05}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &8240871549940202899
 MonoBehaviour:
@@ -378,8 +378,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.04, y: 0.03, z: 0.4}
-  m_Center: {x: 0.000000059604645, y: -1.5881868e-22, z: -0.00000008940699}
+  m_Size: {x: 0.07, y: 0.02, z: 0.4}
+  m_Center: {x: 0, y: -0.001, z: 0}
 --- !u!54 &6219995784980942023
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -420,3 +420,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   jjuCount: 0
+  clipJjuToStick: {fileID: 8300000, guid: 4ea21b417d13bdc48834d55dba08e00c, type: 3}

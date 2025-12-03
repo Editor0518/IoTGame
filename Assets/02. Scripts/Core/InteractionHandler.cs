@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using System.Linq; // LINQ를 사용하여 컬렉션(handPos의 자식들) 관리를 쉽게 합니다.
 
 public class InteractionHandler : MonoBehaviour
 {
@@ -19,7 +20,7 @@ public class InteractionHandler : MonoBehaviour
 
     private Camera cam;
     [Header("잡힌 오브젝트 (Hand)")]
-    private Transform selectedObject;
+    // private Transform selectedObject; // ⭐ [수정] 단일 오브젝트 변수 제거. handPos의 자식들로 대체됩니다.
     private Vector3 offset;
     private int layerMask;
 
@@ -33,8 +34,23 @@ public class InteractionHandler : MonoBehaviour
         JJU, STICK, SAUCE
     }
 
-    // 오브젝트를 잡은 상태인지 확인
-    public bool IsHoldingObject => selectedObject != null;
+    // ⭐ [수정] 오브젝트를 잡은 상태인지 확인 (handPos의 자식 개수로 판단)
+    public bool IsHoldingObject => handPos.childCount > 0;
+    
+    // ⭐ [추가] 현재 들고 있는 쮸의 개수
+    public int HeldJjuCount => GetHeldJjus().Count;
+
+    // ⭐ [추가] handPos의 자식 중 jju 태그를 가진 리스트를 반환합니다.
+    private List<Transform> GetHeldJjus()
+    {
+        return handPos.Cast<Transform>().Where(t => t.CompareTag("jju")).ToList();
+    }
+    
+    // ⭐ [추가] handPos의 자식 중 jju가 아닌 오브젝트(Stick/Sauce)를 반환합니다.
+    private Transform GetHeldNonJjuObject()
+    {
+        return handPos.Cast<Transform>().FirstOrDefault(t => !t.CompareTag("jju"));
+    }
 
     void Awake()
     {
@@ -53,50 +69,97 @@ public class InteractionHandler : MonoBehaviour
 
     /// <summary>
     /// 오브젝트를 손(handPos) 위치에 붙잡습니다.
+    /// jju는 최대 3개까지 들 수 있으며, stick/sauce는 jju와 동시에 들 수 없습니다.
     /// </summary>
     public void PickUp(Transform obj)
     {
-        // 리지드바디 제거 및 키네마틱 설정
+        // 1. 현재 들고 있는 비(非) jju 오브젝트 확인 (Stick/Sauce)
+        Transform currentlyHeldNonJju = GetHeldNonJjuObject();
+        
+        // 2. 들려는 오브젝트의 태그 확인
+        bool isJju = obj.CompareTag("jju");
+
+        // --- PickUp 제약 로직 ---
+        if (isJju)
+        {
+            // A. Jju를 들려는 경우: Stick/Sauce를 들고 있으면 안 됨
+            if (currentlyHeldNonJju != null)
+            {
+                Debug.LogWarning("[Interaction] Stick 또는 Sauce를 들고 있을 때는 Jju를 추가로 잡을 수 없습니다.");
+                return;
+            }
+
+            // Jju 개수 제한 확인
+            if (HeldJjuCount >= 3)
+            {
+                Debug.LogWarning("[Interaction] Jju는 최대 3개까지 들 수 있습니다.");
+                return;
+            }
+            
+            Debug.Log($"[Interaction] {obj.name} 잡음 (현재 Jju 개수: {HeldJjuCount + 1})");
+        }
+        else // B. Non-Jju (Stick/Sauce)를 들려는 경우: Jju들을 들고 있으면 안 됨
+        {
+            if (IsHoldingObject) // 이미 무언가를 들고 있다면 (Jju들을 들고 있다면)
+            {
+                Debug.LogWarning($"[Interaction] Jju를 들고 있을 때는 {obj.name}를 잡을 수 없습니다. 먼저 내려놓으세요.");
+                return;
+            }
+            Debug.Log($"[Interaction] {obj.name} 잡음 (단일 오브젝트)");
+        }
+        
+        // PickUp 공통 처리
         if (obj.TryGetComponent(out Rigidbody rb))
         {
             rb.isKinematic = true;
             rb.useGravity = false;
         }
 
-        selectedObject = obj;
-        selectedObject.transform.parent=(handPos);
-        selectedObject.localPosition = Vector3.zero; // 손 위치에 정확히
-        selectedObject.localRotation = Quaternion.identity; // 회전 초기화 (원하는 회전으로 조정 가능)
+        // ⭐ [수정] selectedObject 대신 obj를 handPos의 자식으로 설정
+        obj.transform.parent = handPos;
+        obj.localPosition = Vector3.zero; // 손 위치에 정확히
+        obj.localRotation = Quaternion.identity; // 회전 초기화
         
-        Debug.Log($"[Interaction] {obj.name} 잡음 (HandPos 자식)");
+        if(obj.CompareTag("jju"))
+            SoundManager.instance.PlaySound(clipJjuPick);
+        else if(obj.CompareTag("stick"))
+            SoundManager.instance.PlaySound(clipStickPick);
+        else if(obj.CompareTag("sauce"))
+            SoundManager.instance.PlaySound(clipSaucePick);
     }
 
     /// <summary>
-    /// 오브젝트를 놓습니다. 레이캐스트가 닿은 위치에 놓습니다. (높이 보정 로직 포함)
+    /// 오브젝트를 놓습니다. 가장 먼저 잡은 오브젝트(0번째 자식)부터 놓습니다.
     /// </summary>
     public void PutDown(RaycastHit hit)
     {
-        if (selectedObject == null) return;
+        // ⭐ [수정] selectedObject 대신 handPos의 자식 개수로 체크
+        if (handPos.childCount == 0) return;
     
-        // ⭐ [핵심 1] Jju가 붙어있는 Stick이라면, 자식 Jju의 Kinematic 상태를 일시적으로 끕니다.
-        // Stick의 Transform(selectedObject)에서 JjuStick 컴포넌트를 찾습니다.
-        if (selectedObject.TryGetComponent(out JjuStick jjuStick))
+        // ⭐ [핵심] 가장 먼저 잡은 오브젝트(0번째 자식)를 내려놓습니다.
+        Transform objectToDrop = handPos.GetChild(0);
+
+        // 리지드바디 상태 임시 저장 및 JjuStick 처리 (Stick을 내려놓는 경우)
+        JjuStick jjuStick = null;
+        if (objectToDrop.TryGetComponent(out jjuStick))
         {
-            // Stick의 Transform을 조작할 때 자식 Jju가 튀지 않도록, Jju의 Kinematic을 잠시 끕니다.
-            // Jju는 Stick에 부착된 상태이므로, 이미 Kinematic=true 상태일 것입니다. 
-            // 여기서 다시 한 번 호출하여 물리 시스템에 갱신을 확실히 합니다.
+            // Stick의 Transform(objectToDrop)에서 JjuStick 컴포넌트를 찾습니다.
             jjuStick.SetAttachedJjusKinematic(true); 
         }
+
+        // Sound
+        if(objectToDrop.CompareTag("jju"))
+            SoundManager.instance.PlaySound(clipJjuDown);
+        else if(objectToDrop.CompareTag("stick"))
+            SoundManager.instance.PlaySound(clipStickPick);
+        else if(objectToDrop.CompareTag("sauce"))
+            SoundManager.instance.PlaySound(clipSaucePick);
     
-        // 1. 부모 해제
-        selectedObject.parent = null;
+        // 1. 부모 해제 (handPos에서 분리)
+        objectToDrop.parent = null;
     
         // 2. 높이 보정 계산
-        Renderer renderer = selectedObject.GetComponent<Renderer>();
-        if (renderer == null)
-        {
-            renderer = selectedObject.GetComponentInChildren<Renderer>();
-        }
+        Renderer renderer = objectToDrop.GetComponent<Renderer>() ?? objectToDrop.GetComponentInChildren<Renderer>();
         
         float halfHeight = 0f;
         if (renderer != null)
@@ -111,80 +174,64 @@ public class InteractionHandler : MonoBehaviour
         // 3. 충돌 지점에서 halfHeight만큼 hit.normal 방향으로 올려서 이동
         Vector3 placementPosition = hit.point + hit.normal * halfHeight;
     
-        // ⭐ 핵심: Kinematic 상태일 때 위치를 직접 설정합니다.
-        // Stick (selectedObject)은 PickUp 상태에서 isKinematic = true 이므로,
-        // 이 순간 이동은 Jju에 물리적인 충격을 주지 않고 정확하게 위치를 지정합니다.
-        selectedObject.position = placementPosition;
+        // ⭐ Kinematic 상태일 때 위치를 직접 설정합니다.
+        objectToDrop.position = placementPosition;
         
         // 4. 물리 활성화
-        if (selectedObject.TryGetComponent(out Rigidbody rb))
+        if (objectToDrop.TryGetComponent(out Rigidbody rb))
         {
-            // ⭐ 핵심: Transform 조작 전에 Stick의 물리 활성화 (Kinematic = false)
             rb.isKinematic = false;
-        
-            // ⭐ 핵심: Rigidbody.MovePosition을 사용하여 안전하게 위치를 조정합니다.
-            // Stick을 내려놓을 최종 위치로 부드럽게(물리 엔진에 의해) 이동시킵니다.
             rb.MovePosition(placementPosition);
-        
             rb.useGravity = true;
-            // 놓을 때 속도가 0이 되도록 설정 
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
         }
-        else // Rigidbody가 없는 경우 (예외 처리)
-        {
-            selectedObject.position = placementPosition;
-        }
-
 
         // 5. 자식 Jju의 Kinematic 상태 유지 (Stick에 붙어있도록)
         if (jjuStick != null)
         {
-            // Stick이 놓였고 물리적 움직임을 시작했으므로, 
-            // Jju는 계속 Kinematic=true 상태를 유지하여 Stick의 Transform을 따라가게 합니다.
-            // (이 코드가 JjuStick.cs에 있어야 합니다.)
             jjuStick.SetAttachedJjusKinematic(true); 
-            
         }
 
-        if (selectedObject.TryGetComponent<Collider>(out Collider col))
+        if (objectToDrop.TryGetComponent<Collider>(out Collider col))
         {
             col.isTrigger = false;
         }
 
-        Debug.Log($"[Interaction] {selectedObject.name} 놓음 (위치: {placementPosition})");
-        selectedObject = null;
-    
+        Debug.Log($"[Interaction] {objectToDrop.name} 놓음 (위치: {placementPosition})");
     }
     
     /// <summary>
-    /// 잡고 있는 jju를 stick의 특정 attachmentPoint에 끼웁니다.
+    /// 잡고 있는 jju 중 가장 먼저 잡은 Jju(0번째 자식)를 stick의 특정 attachmentPoint에 끼웁니다.
     /// </summary>
     /// <param name="attachmentPoint">stickholder 태그를 가진 Transform</param>
     public void AttachJjuToStick(Transform attachmentPoint)
     {
+        List<Transform> heldJjus = GetHeldJjus();
+        
         // 안전 확인: 잡고 있는 물체가 jju인지 확인합니다.
-        if (selectedObject == null || !selectedObject.CompareTag("jju")) 
+        if (heldJjus.Count == 0) 
         {
-            Debug.LogWarning("[AttachJjuToStick] 선택된 오브젝트가 jju가 아니거나 없습니다.");
+            Debug.LogWarning("[AttachJjuToStick] 잡고 있는 jju가 없습니다.");
             return;
         }
 
+        // ⭐ [핵심] 가장 먼저 잡은 Jju (0번째 자식)를 사용
+        Transform jjuToAttach = heldJjus[0];
+
         if (attachmentPoint.TryGetComponent(out JjuStick jjuStick))
         {
-            Rigidbody jjuRb = selectedObject.GetComponent<Rigidbody>();
-            jjuStick.AttachJjuToStick(jjuRb);
+            Rigidbody jjuRb = jjuToAttach.GetComponent<Rigidbody>();
+            // JjuStick 내부에서 Attach 성공 시, jjuToAttach는 handPos의 자식에서 분리됩니다.
+            jjuStick.AttachJjuToStick(jjuRb); 
+            Debug.Log($"[Interaction] {jjuToAttach.name}을 {attachmentPoint.name}에 끼웠습니다.");
         }
-        
-       // Debug.Log($"[Interaction] {selectedObject.name}을 {attachmentPoint.name}에 끼웠습니다. (태그: {attachmentPoint.tag})");
-
-        // 6. 잡고 있는 오브젝트 해제
-        //이미 3개 다 끼웠다면 안끼워지게 막아야하므로 jjustick 에서 처리시킴.
     }
 
+    // ⭐ [수정] selectedObject 변수가 없어졌으므로 이 함수는 더 이상 필요하지 않습니다.
     public void NoSelectedObject()
     {
-        selectedObject = null;
+        // Pass
     }
     
     
@@ -270,37 +317,64 @@ public class InteractionHandler : MonoBehaviour
         RaycastHit hit;
 
         // 레이캐스트로 오브젝트 맞았는지 체크
-        if (Physics.Raycast(ray, out hit, 100f, layerMask))
+        if (Physics.Raycast(ray, out hit, 5f, layerMask))
         {
-            // --- 1. 잡고 있는 오브젝트가 있다면, 놓기 또는 끼우기 ---
+            // --- 1. 잡고 있는 오브젝트가 있다면, 놓기 또는 끼우기 또는 "추가로 잡기" ---
             if (IsHoldingObject)
             {
                 // A. Jju를 stickholder(끼우는 지점)에 끼우려는 시도인지 확인
-                // 잡고 있는 물체가 jju여야 하고, hit된 물체가 stickholder 태그를 가져야 합니다.
-                if (selectedObject.CompareTag("jju") && hit.collider.CompareTag("stickPos"))
+                // 들고 있는 쮸가 있어야 하고 (HeldJjuCount > 0), hit된 물체가 stickPos 태그를 가져야 합니다.
+                if (HeldJjuCount > 0 && hit.collider.CompareTag("stickPos"))
                 {
                     Debug.Log("쮸 꽃기 시도!");
+                    // 가장 먼저 잡은 Jju (0번째 자식)를 끼웁니다.
                     AttachJjuToStick(hit.transform);
                     return;
                 }
                 
-                // ⭐️ B. 일반적인 놓기: stick 본체 위에 놓는 것을 방지
-                // 잡고 있는 물체가 jju인데, hit된 물체가 stick 본체라면 무시하고 놓지 않도록 합니다.
-                if (selectedObject.CompareTag("jju") && hit.collider.CompareTag("stick"))
+                // ⭐️ B. 일반적인 놓기 방지: stick 본체 위에 놓는 것을 방지
+                if (handPos.childCount > 0 && handPos.GetChild(0).CompareTag("jju") && hit.collider.CompareTag("stick"))
                 {
                     Debug.Log("[Interaction] Jju는 Stick 본체에 직접 놓을 수 없습니다. Socket에 조준하세요.");
                     return;
                 }
                 
-                // C. 그 외 모든 경우 (바닥, Pot, 기타 오브젝트)에 놓기
+                // C. Sauce 사용 시도 (현재 놓으려는 오브젝트(0번째 자식)가 sauce인 경우)
+                if (handPos.childCount > 0 && handPos.GetChild(0).CompareTag("sauce") && (hit.collider.CompareTag("jju")||hit.collider.CompareTag("stickPos")))
+                {
+                    Debug.Log("소스 바르기 시도!");
+                    SauceUse(hit.transform);
+                    return;
+                }
+
+                // ⭐ [수정됨] D. 추가로 Jju 잡기 (Stacking)
+                // 현재 Jju를 들고 있고, 바라보는 대상이 'jju'이거나 'pot'이라면 '내려놓기' 대신 '추가 잡기'를 시도합니다.
+                if (HeldJjuCount > 0)
+                {
+                    if (hit.collider.CompareTag("jju"))
+                    {
+                        // 이미 쮸를 들고 있어도, 바닥에 있는 다른 쮸를 클릭하면 PickUp을 시도합니다.
+                        PickUp(hit.transform); 
+                        return; // 내려놓지 않고 리턴
+                    }
+                    else if (hit.collider.CompareTag("pot"))
+                    {
+                        // 팟을 클릭하면 새 쮸를 꺼내서 추가로 잡습니다.
+                        GetNewJjuFromPot(hit.transform);
+                        return; // 내려놓지 않고 리턴
+                    }
+                }
+                
+                // E. 그 외 모든 경우 (바닥, 기타 오브젝트) -> 내려놓기
                 PutDown(hit);
                 return;
             }
             
             // --- 2. 잡고 있는 오브젝트가 없다면, 잡거나 (PickUp) 생성 (Instantiate) ---
-            if (hit.collider.CompareTag("jju") || hit.collider.CompareTag("stick"))
+            if (hit.collider.CompareTag("jju") || hit.collider.CompareTag("stick")||hit.collider.CompareTag("sauce"))
             {
                 // 이미 존재하는 jju/stick 잡기
+                // PickUp 내부에서 3개 제한 및 동시 들기 금지 로직이 처리됩니다.
                 PickUp(hit.transform);
             }
             else if (hit.collider.CompareTag("pot"))
@@ -312,12 +386,10 @@ public class InteractionHandler : MonoBehaviour
             else if (hit.collider.CompareTag("stickholder"))
             {
                 // stickholder(소스 컨테이너)에서 새로운 stick을 인스턴스화 하여 잡기
-                // 주의: "stickholder" 태그가 두 가지 용도로 사용됩니다.
-                // jju를 잡고 있지 않으므로, 이 stickholder는 소스 컨테이너일 가능성이 높습니다.
                 GetNewStickFromHolder(hit.transform);
                 Debug.Log("hit stickholder!");
             }
-            // TODO: 다른 상호작용 (문 열기, 스위치) 로직 추가
+            
         }
         else
         {
@@ -331,8 +403,22 @@ public class InteractionHandler : MonoBehaviour
         }
     }
 
-    // ... (생략)
-
+    void SauceUse(Transform obj)
+    {
+        Jju jju=obj.GetComponent<Jju>();
+        if (jju == null)
+        {
+            if(obj.childCount>0)
+                jju=obj.GetChild(0).GetComponent<Jju>();
+            else return;//쮸 안 꽂혀있음!
+        }
+        if (jju != null){
+            jju.AddSauce(0.3f);
+             SoundManager.instance.PlaySound(clipSauceUse);
+        }
+        
+    }
+    
 
     public GameObject jjuPrefab;
     public GameObject stickPrefab;
@@ -346,7 +432,7 @@ public class InteractionHandler : MonoBehaviour
         // potTransform 위치에 일단 생성
         jju.transform.position = potTransform.position;
         
-        // 생성 후 바로 잡습니다.
+        // 생성 후 바로 잡습니다. (PickUp에서 개수 제한 체크)
         PickUp(jju.transform);
     }
 
@@ -358,7 +444,7 @@ public class InteractionHandler : MonoBehaviour
         // holderTransform 위치에 일단 생성
         stick.transform.position = holderTransform.position;
         
-        // 생성 후 바로 잡습니다.
+        // 생성 후 바로 잡습니다. (PickUp에서 동시 들기 금지 체크)
         PickUp(stick.transform);
     }
     
@@ -369,5 +455,18 @@ public class InteractionHandler : MonoBehaviour
         SelectOutline();
         if (ArduinoSerialManager.Instance.isButtonReleased) { TryInteract(); }
     }
+
     
+    [Header("SOUND EFFECTS")]
+    public AudioClip clipJjuDown;//쮸 내려놓음
+
+    public AudioClip clipJjuPick;//쮸 집어드는 소리
+    public AudioClip clipStickPick;//꼬치 집어드는 소리
+    public AudioClip clipSaucePick;//소스 집어드는 소리
+    public AudioClip clipSauceUse;//소스 푹짬
+
+
+
+
+
 }

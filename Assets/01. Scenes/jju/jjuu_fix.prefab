@@ -72,6 +72,14 @@ PrefabInstance:
       propertyPath: m_LocalPosition.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6164996480583612547, guid: fec0b39ff7e1ae240887339de66cd4b0, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6164996480583612547, guid: fec0b39ff7e1ae240887339de66cd4b0, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: fa1f355cf8693cf4da82ff18da47c8b9, type: 2}
     - target: {fileID: 7086560957254312686, guid: fec0b39ff7e1ae240887339de66cd4b0, type: 3}
       propertyPath: m_LocalPosition.y
       value: -0
@@ -169,6 +177,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   move: 0
+  burntMaterial: {fileID: 2100000, guid: fa1f355cf8693cf4da82ff18da47c8b9, type: 2}
+  isOnFire: 0
 --- !u!1 &6688616342007544994 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -2511240423080479738, guid: fec0b39ff7e1ae240887339de66cd4b0, type: 3}

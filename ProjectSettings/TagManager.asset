@@ -9,6 +9,7 @@ TagManager:
   - stick
   - stickholder
   - stickPos
+  - sauce
   layers:
   - Default
   - TransparentFX
@@ -20,8 +21,8 @@ TagManager:
   - stick
   - jju
   - stickjju
-  - 
-  - 
+  - Customer
+  - Sauce
   - 
   - 
   - 
