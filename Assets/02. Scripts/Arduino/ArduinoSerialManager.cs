@@ -225,4 +225,14 @@ public class ArduinoSerialManager : MonoBehaviour
     {
         CloseConnection();
     }
+    
+    public void SendRevenue()
+    {
+        if (!IsConnected) return;
+
+        int totalMoney=Customers.totalCappy;
+        string msg = "(C)" + totalMoney.ToString();
+        Debug.Log("[ArduinoSerialManager] SendRevenue: " + msg);
+        SendLine(msg);
+    }
 }

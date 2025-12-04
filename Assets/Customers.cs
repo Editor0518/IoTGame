@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
@@ -16,6 +18,7 @@ public class Customers : MonoBehaviour
            string[] msg = other.GetComponent<JjuStick>().GetJjuScore();
            totalCappy += int.Parse(msg[1]);
            cappyText.text = totalCappy.ToString();
+           ArduinoSerialManager.Instance.SendRevenue();
            CustomerSay(msg[0]);
            SoundManager.instance.PlaySound(clipCappy);
            Debug.Log(msg);
@@ -26,6 +29,9 @@ public class Customers : MonoBehaviour
     private void Start()
     {
         totalCappy = 0;
+       ArduinoSerialManager.Instance.SendRevenue();
+
+       StartCoroutine(Test());
     }
 
     void CustomerSay(string msg)
@@ -33,5 +39,16 @@ public class Customers : MonoBehaviour
         customerSay.gameObject.SetActive(false);
         customerSay.text = msg;
         customerSay.gameObject.SetActive(true);
+    }
+
+    IEnumerator Test()
+    {
+        while (totalCappy<=2000)
+        {
+            totalCappy += 10;
+            cappyText.text = totalCappy.ToString();
+            ArduinoSerialManager.Instance.SendRevenue();
+            yield return new WaitForSeconds(1f);
+        }
     }
 }

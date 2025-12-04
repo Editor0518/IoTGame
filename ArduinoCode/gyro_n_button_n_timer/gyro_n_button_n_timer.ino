@@ -7,23 +7,28 @@ float GyroScale = 16384.0; // Gyro 데이터 스케일 (MPU6500 기본 설정 �
 
 ///---------7 segments & Buzzer------------///
 // Common Anode 또는 반전된 회로 구성 가정 [cite: 11]
-int num_array[10][7] = { { 1,1,1,1,1,1,0 }, // 0 [cite: 12]
-                         { 0,1,1,0,0,0,0 }, // 1 [cite: 12]
-                         { 1,1,0,1,1,0,1 }, // 2 [cite: 12]
-                         { 1,1,1,1,0,0,1 }, // 3 [cite: 12]
-                         { 0,1,1,0,0,1,1 }, // 4 [cite: 13]
-                         { 1,0,1,1,0,1,1 }, // 5 [cite: 13]
-                         { 1,0,1,1,1,1,1 }, // 6 [cite: 13]
-                         { 1,1,1,0,0,0,0 }, // 7 [cite: 14]
-                         { 1,1,1,1,1,1,1 }, // 8 [cite: 14]
-                         { 1,1,1,1,0,1,1 }}; // 9 [cite: 15]
+int num_array[10][7] = { 
+  { 1, 1, 1, 0, 1, 1, 1 },    // 0
+  { 0, 1, 1, 0, 0, 0, 0 },    // 1
+  { 1, 1, 0, 1, 1, 0, 1 },    // 2
+  { 1, 1, 1, 1, 0, 0, 1 },    // 3
+  { 0, 1, 1, 1, 0, 1, 0 },    // 4
+  { 1, 0, 1, 1, 0, 1, 1 },    // 5
+  { 1, 0, 1, 1, 1, 1, 1 },    // 6
+  { 0, 1, 1, 0, 0, 0, 1 },    // 7
+  { 1, 1, 1, 1, 1, 1, 1 },    // 8
+  { 1, 1, 1, 1, 0, 1, 1 }     // 9
+};
+
 
 const int SegPinStart = 2; // 세그먼트 a 핀 (a=2, g=8) [cite: 15]
-const int D1=9; // 분 10의 자리 (M10) [cite: 16]
-const int D2=10; // 분 1의 자리 (M1) [cite: 16]
-const int D3=11; // 초 10의 자리 (S10) [cite: 17]
-const int D4=12; // 초 1의 자리 (S1) [cite: 17]
-const int BuzzerPin = 3; // 부저 핀 [cite: 17]
+const int D1 = A2;
+const int D2 = 10;
+const int D3 = 12;
+const int D4 = 9;
+const int BUZZER_PIN = A0;
+
+const int BuzzerPin = A0; // 부저 핀 [cite: 17]
 
 int timerSeconds = 300; // 타이머 변수 (5분 = 300초로 초기화) [cite: 18]
 unsigned long lastUpdateTime = 0;
@@ -32,7 +37,7 @@ const long updateInterval = 1000; // 1초 [cite: 19]
 String serialData = ""; // 시리얼 입력 버퍼
 
 ///-----------BUTTON CLICK-------------///
-const int buttonPin = 13; // 버튼을 14번 핀으로 변경 (13번은 부저가 사용) [cite: 1]
+const int buttonPin = A3; // 버튼을 14번 핀으로 변경 (13번은 부저가 사용) [cite: 1]
 int lastButtonState = HIGH; // 이전 버튼 상태 (초기 상태는 HIGH: 떼어짐) [cite: 2]
 bool buttonReleased = false; // Unity에 전송할 버튼 릴리즈 상태 플래그
 
@@ -55,7 +60,7 @@ void printToUnity();
  */
 void setup() {
     Serial.begin(9600); // 시리얼 통신 초기화 [cite: 21]
-    
+    Serial.println("ARDUINO_START");
     // 버튼 핀 설정 [cite: 3]
     pinMode(buttonPin, INPUT_PULLUP);
     
