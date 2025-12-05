@@ -32200,6 +32200,7 @@ MonoBehaviour:
   currentInputYaw: 0
   currentInputPitch: 0
   currentPitchAngle: 0
+  useAccelerometerForPitchRoll: 1
 --- !u!1 &1768198913
 GameObject:
   m_ObjectHideFlags: 0
@@ -61296,7 +61297,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2af8cb3ae0bde8b4691f0ff8267845e0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  inputType: 0
+  inputType: 1
 --- !u!1 &5274691432731778414
 GameObject:
   m_ObjectHideFlags: 0
