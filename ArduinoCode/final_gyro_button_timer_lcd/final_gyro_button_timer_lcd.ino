@@ -335,7 +335,7 @@ void readSerialInput() {
             // 새 줄 문자(\n)가 입력되면 데이터 처리
             if (serialData.length() > 0) {
                 // 1. [NEW] 매출 데이터 처리 (C1234 형식)
-                if (serialData.startsWith("(C)")) {
+                if (serialData.startsWith("C")) {
                     // 'C'를 제외한 나머지 부분을 숫자로 변환
                     long revenue = serialData.substring(1).toInt();
                     if (revenue >= 0) {

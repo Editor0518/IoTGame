@@ -24855,6 +24855,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Roast Canvas
       objectReference: {fileID: 0}
+    - target: {fileID: 8819399482456055799, guid: 7e2f8833b28303e4bbb7795b2bad59c1, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
