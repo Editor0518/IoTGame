@@ -31,7 +31,7 @@ public class Customers : MonoBehaviour
         totalCappy = 0;
        ArduinoSerialManager.Instance.SendRevenue();
 
-       StartCoroutine(Test());
+       //StartCoroutine(Test());
     }
 
     void CustomerSay(string msg)
@@ -43,6 +43,7 @@ public class Customers : MonoBehaviour
 
     IEnumerator Test()
     {
+       
         while (totalCappy<=2000)
         {
             totalCappy += 10;

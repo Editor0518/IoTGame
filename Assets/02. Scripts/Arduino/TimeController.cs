@@ -6,6 +6,10 @@ public class TimerController : MonoBehaviour
     [Tooltip("타이머 총 시간(초). 5분 = 300초")]
     public int totalTimeSeconds = 300;  // 5분 = 300초
 
+    public GameObject canvas;
+    public TMP_Text stateText;
+    public TMP_Text cappyText;
+    
     private float remainingTime;
     private int lastSentSeconds = -1;
     private bool isRunning = false;
@@ -49,6 +53,23 @@ public class TimerController : MonoBehaviour
         timeText.text = minutes.ToString("00") + ":" + seconds.ToString("00");
     }
 
+    void TimeOver()
+    {
+        int cappy = Customers.totalCappy;
+
+        if (cappy > 5000)
+        {
+            stateText.text = "오늘 장사는 성공적이었다!";
+        }
+        else
+        {
+            stateText.text = "우빈이는 설거지나 해야겠다~";
+        }
+        
+        cappyText.text = cappy + " 캐피";
+        canvas.SetActive(true);
+    }
+
     void Update()
     {
         if (!isRunning) return;
@@ -61,6 +82,7 @@ public class TimerController : MonoBehaviour
             isRunning = false;
             isTimeOver = true;
             Debug.Log("TIME OVER!");
+            TimeOver();
         }
 
         int currentSeconds = Mathf.RoundToInt(remainingTime);
