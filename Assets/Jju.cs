@@ -16,7 +16,14 @@ public class Jju : MonoBehaviour
     public float sauceAmount = 0f;
     
     public bool isOnFire=false;
-    
+
+    public AudioClip clip;
+
+    private void OnEnable()
+    {
+//        SoundManager.instance.PlaySound(clip);
+    }
+
     private void Start()
     {
         rb = GetComponent<Rigidbody>();

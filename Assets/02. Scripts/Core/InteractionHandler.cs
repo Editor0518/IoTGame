@@ -31,7 +31,7 @@ public class InteractionHandler : MonoBehaviour
     
     public enum InteractionType
     {
-        JJU, STICK, SAUCE
+        JJU, STICK, SAUCE, GUN
     }
 
     // ⭐ [수정] 오브젝트를 잡은 상태인지 확인 (handPos의 자식 개수로 판단)
@@ -126,6 +126,8 @@ public class InteractionHandler : MonoBehaviour
             SoundManager.instance.PlaySound(clipStickPick);
         else if(obj.CompareTag("sauce"))
             SoundManager.instance.PlaySound(clipSaucePick);
+       // else if(obj.CompareTag("gun"))
+            //SoundManager.instance.PlaySound(clipSaucePick);
     }
 
     /// <summary>
@@ -322,6 +324,18 @@ public class InteractionHandler : MonoBehaviour
             // --- 1. 잡고 있는 오브젝트가 있다면, 놓기 또는 끼우기 또는 "추가로 잡기" ---
             if (IsHoldingObject)
             {
+                // --- 총 발사 로직 추가 ---
+                Transform heldObject = handPos.GetChild(0); // 현재 잡고 있는 물체
+                if (heldObject.CompareTag("gun"))
+                {
+                    if (heldObject.TryGetComponent(out Gun gun))
+                    {
+                        gun.Fire(cam); // 총의 Fire 함수 호출
+                        return; // 총을 쏘면 물건을 내려놓지 않음
+                    }
+                }
+                
+                
                 // A. Jju를 stickholder(끼우는 지점)에 끼우려는 시도인지 확인
                 // 들고 있는 쮸가 있어야 하고 (HeldJjuCount > 0), hit된 물체가 stickPos 태그를 가져야 합니다.
                 if (HeldJjuCount > 0 && hit.collider.CompareTag("stickPos"))
@@ -370,11 +384,11 @@ public class InteractionHandler : MonoBehaviour
                 return;
             }
             
-            // --- 2. 잡고 있는 오브젝트가 없다면, 잡거나 (PickUp) 생성 (Instantiate) ---
-            if (hit.collider.CompareTag("jju") || hit.collider.CompareTag("stick")||hit.collider.CompareTag("sauce"))
+            // --- 2. 잡고 있는 오브젝트가 없다면 (PickUp 로직) ---
+            // 기존 코드에 'gun' 태그 체크가 이미 포함되어 있는지 확인하세요.
+            if (hit.collider.CompareTag("jju") || hit.collider.CompareTag("stick") || 
+                hit.collider.CompareTag("sauce") || hit.collider.CompareTag("gun")) // 'gun' 추가
             {
-                // 이미 존재하는 jju/stick 잡기
-                // PickUp 내부에서 3개 제한 및 동시 들기 금지 로직이 처리됩니다.
                 PickUp(hit.transform);
             }
             else if (hit.collider.CompareTag("pot"))

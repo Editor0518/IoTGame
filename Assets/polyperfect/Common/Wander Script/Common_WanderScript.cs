@@ -913,6 +913,10 @@ namespace Polyperfect.Common
         {
             yield return new WaitForSeconds(Random.Range(0f, 2f));
             started = true;
+            
+            // ⭐ 이 코드를 추가하여 시작하자마자 Idle 상태의 로직(애니메이션 bool 설정 등)을 실행합니다.
+            SetState(WanderState.Idle);
+            
             StartCoroutine(ConstantTicking(Random.Range(.7f,1f)));
         }
 

@@ -10,6 +10,7 @@ TagManager:
   - stickholder
   - stickPos
   - sauce
+  - gun
   layers:
   - Default
   - TransparentFX
@@ -23,7 +24,7 @@ TagManager:
   - stickjju
   - Customer
   - Sauce
-  - 
+  - gun
   - 
   - 
   - 
